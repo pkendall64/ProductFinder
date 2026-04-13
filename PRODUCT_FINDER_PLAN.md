@@ -215,6 +215,8 @@ Current status:
 - Vite-based local development and production build flow implemented
 - URL-backed filters implemented
 - Results cards implemented
+- Result cards now keep their normal content stable and use a manually controlled animated side hover popup rendered outside the scrolling grid, so enrichment previews avoid container clipping while still overlapping the card slightly and closing cleanly between cards
+- The results pane now uses an internal content gutter, and the cards themselves use a restrained raised shadow rather than edge-fade effects
 - Update method filter removed from the UI
 - Product type now replaces separate category/TX-type filtering in the UI
 - Diversity filter is presented explicitly as `Single`, `Antenna`, and `Gemini (True Diversity)`
@@ -237,6 +239,7 @@ Current status:
 
 - GitHub Actions workflow added for GitHub Pages deployment
 - Workflow fetches hardware, builds the catalog, and deploys the static site
+- Manual enrichment is now being seeded vendor by vendor with verified `product_url` and `image_url` entries, starting with an initial RadioMaster batch
 
 ## Suggested Repository Structure
 

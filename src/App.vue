@@ -16,6 +16,9 @@ const filters = reactive({...defaults})
 const resultsPanel = ref(null)
 const resultsScroll = ref(null)
 const resultsScrollHeight = ref(null)
+const activePreviewId = ref('')
+const activePreviewSide = ref('right')
+const activePreviewStyle = ref({})
 const catalog = reactive({
   items: [],
   loaded: false,
@@ -23,6 +26,7 @@ const catalog = reactive({
 })
 let resultsResizeObserver = null
 let heightUpdateFrame = null
+let previewCloseTimer = null
 
 const selectLabels = {
   classification: 'Any product type',
@@ -156,6 +160,46 @@ function cardSpecs(product) {
   return specs
 }
 
+function hasPreview(product) {
+  return Boolean(product.image_url || product.product_url)
+}
+
+function openPreview(productId, event) {
+  if (previewCloseTimer != null) clearTimeout(previewCloseTimer)
+  const card = event?.currentTarget
+  if (card instanceof HTMLElement) {
+    const rect = card.getBoundingClientRect()
+    const previewWidth = 288
+    const gap = -18
+    const margin = 24
+    activePreviewSide.value = rect.right + gap + previewWidth <= window.innerWidth - 24 ? 'right' : 'left'
+    const top = Math.max(margin, Math.min(rect.top + 10, window.innerHeight - 344 - margin))
+    const left = activePreviewSide.value === 'right'
+      ? Math.min(rect.right + gap, window.innerWidth - previewWidth - margin)
+      : Math.max(margin, rect.left - previewWidth - gap)
+    activePreviewStyle.value = {
+      top: `${top}px`,
+      left: `${left}px`,
+    }
+  }
+  activePreviewId.value = productId
+}
+
+function schedulePreviewClose(productId) {
+  if (previewCloseTimer != null) clearTimeout(previewCloseTimer)
+  previewCloseTimer = setTimeout(() => {
+    if (activePreviewId.value === productId) activePreviewId.value = ''
+    previewCloseTimer = null
+  }, 120)
+}
+
+function closePreview() {
+  if (previewCloseTimer != null) clearTimeout(previewCloseTimer)
+  previewCloseTimer = null
+  activePreviewId.value = ''
+  activePreviewStyle.value = {}
+}
+
 function clearFilters() {
   Object.assign(filters, defaults)
 }
@@ -269,6 +313,7 @@ const minPwmItems = computed(() => [
 ])
 
 const filteredProducts = computed(() => catalog.items.filter(matchesProduct))
+const activePreviewProduct = computed(() => catalog.items.find((item) => item.id === activePreviewId.value) || null)
 const vendorCount = computed(() => new Set(catalog.items.map((item) => item.vendor)).size)
 const receiverCount = computed(() => catalog.items.filter((item) => item.device_class === 'receiver').length)
 const moduleCount = computed(() => catalog.items.filter((item) => item.device_class === 'transmitter_module').length)
@@ -338,6 +383,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', scheduleResultsScrollHeightUpdate)
   resultsResizeObserver?.disconnect()
   if (heightUpdateFrame != null) cancelAnimationFrame(heightUpdateFrame)
+  if (previewCloseTimer != null) clearTimeout(previewCloseTimer)
 })
 </script>
 
@@ -496,51 +542,95 @@ onBeforeUnmount(() => {
             <div
               ref="resultsScroll"
               class="results-scroll"
+              @scroll.passive="closePreview"
               :style="resultsScrollHeight ? {maxHeight: `${resultsScrollHeight}px`} : undefined"
             >
-              <div v-if="catalog.error" class="empty-state">
-                Catalog failed to load.
-              </div>
-              <div v-else-if="catalog.loaded && !hasActiveFilters" class="empty-state">
-                Search by vendor or product name, or apply filters like product type, band, diversity, power, PWM, or
-                screen to find supported ExpressLRS hardware.
-              </div>
-              <div v-else-if="catalog.loaded && !filteredProducts.length" class="empty-state">
-                No products matched the current filter set.
-              </div>
-              <div v-else class="results-grid">
-                <VCard
-                  v-for="product in filteredProducts"
-                  :key="product.id"
-                  class="product-card"
-                  :class="product.device_class === 'receiver' ? 'product-card-rx' : 'product-card-tx'"
-                  variant="flat"
-                >
-                  <div class="product-card-header">
-                    <div>
-                      <p class="product-vendor">{{ product.vendor_name }}</p>
-                      <h3 class="product-name">{{ product.product_name }}</h3>
-                    </div>
-                    <VChip class="product-category" color="primary" variant="tonal" rounded="xl">
-                      {{ badgeLabel(product.device_class) }}
-                    </VChip>
-                  </div>
-                  <div class="product-specs">
-                    <div
-                      v-for="[label, value] in cardSpecs(product)"
-                      :key="`${product.id}-${label}`"
-                      class="pill"
+              <div class="results-content">
+                <div v-if="catalog.error" class="empty-state">
+                  Catalog failed to load.
+                </div>
+                <div v-else-if="catalog.loaded && !hasActiveFilters" class="empty-state">
+                  Search by vendor or product name, or apply filters like product type, band, diversity, power, PWM, or
+                  screen to find supported ExpressLRS hardware.
+                </div>
+                <div v-else-if="catalog.loaded && !filteredProducts.length" class="empty-state">
+                  No products matched the current filter set.
+                </div>
+                <div v-else class="results-grid">
+                  <div
+                    v-for="product in filteredProducts"
+                    :key="product.id"
+                    class="product-card-wrap"
+                    :class="product.device_class === 'receiver' ? 'product-card-wrap-rx' : 'product-card-wrap-tx'"
+                    @mouseenter="hasPreview(product) && openPreview(product.id, $event)"
+                    @mouseleave="hasPreview(product) && schedulePreviewClose(product.id)"
+                  >
+                    <VCard
+                      class="product-card"
+                      :class="product.device_class === 'receiver' ? 'product-card-rx' : 'product-card-tx'"
+                      :hover="false"
+                      variant="flat"
                     >
-                      <span>{{ label }}</span>
-                      <strong>{{ value }}</strong>
-                    </div>
+                      <div class="product-card-header">
+                        <p class="product-vendor">{{ product.vendor_name }}</p>
+                        <VChip class="product-category" color="primary" variant="tonal" rounded="xl" size="small">
+                          {{ badgeLabel(product.device_class) }}
+                        </VChip>
+                      </div>
+                      <h3 class="product-name">{{ product.product_name }}</h3>
+                      <div class="product-specs">
+                        <div
+                          v-for="[label, value] in cardSpecs(product)"
+                          :key="`${product.id}-${label}`"
+                          class="pill"
+                        >
+                          <span>{{ label }}</span>
+                          <strong>{{ value }}</strong>
+                        </div>
+                      </div>
+                    </VCard>
                   </div>
-                </VCard>
+                </div>
               </div>
             </div>
           </VCard>
         </div>
       </div>
+      <Teleport to="body">
+        <Transition name="preview-pop">
+          <div
+            v-if="activePreviewProduct && hasPreview(activePreviewProduct)"
+            class="product-preview-popup"
+            :class="activePreviewSide === 'left' ? 'product-preview-popup-left' : 'product-preview-popup-right'"
+            :style="activePreviewStyle"
+            @mouseenter="openPreview(activePreviewProduct.id)"
+            @mouseleave="closePreview()"
+          >
+            <div class="product-preview">
+              <div class="product-preview-media">
+                <img
+                  v-if="activePreviewProduct.image_url"
+                  :src="activePreviewProduct.image_url"
+                  :alt="`${activePreviewProduct.product_name} product image`"
+                  loading="lazy"
+                >
+                <div v-else class="product-preview-placeholder">
+                  No image available
+                </div>
+              </div>
+              <a
+                v-if="activePreviewProduct.product_url"
+                class="product-preview-link"
+                :href="activePreviewProduct.product_url"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Product Page
+              </a>
+            </div>
+          </div>
+        </Transition>
+      </Teleport>
     </VMain>
   </VApp>
 </template>
