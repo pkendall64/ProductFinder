@@ -349,7 +349,7 @@ onBeforeUnmount(() => {
           <div class="hero-copy">
             <h1>ExpressLRS Product Finder</h1>
             <p class="hero-text">
-              Filter supported hardware by role, band, power, PWM, screen, diversity, and update method.
+              All products listed here have been tested and approved by your friendly ExpressLRS dev team!
             </p>
           </div>
           <VHover v-if="catalog.loaded && !catalog.error">
