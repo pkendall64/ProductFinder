@@ -145,7 +145,7 @@ function cardSpecs(product) {
   }
 
   if (product.category === 'tx') {
-    specs.unshift(['Band', product.band_label])
+    specs.unshift(['Band', bandLabel(product.radio_band)])
     if (product.screen_type && product.screen_type !== 'none') {
       specs.push(['Screen', screenLabel(product.screen_type)])
     }

@@ -153,8 +153,39 @@ function productId(vendor, radioKey, target) {
   return `${vendor}:${radioKey}:${target}`
 }
 
-function mergeTags(config, record) {
-  return [...new Set([...(config.features || []), config.platform, record.band_label, record.category])]
+function compactRecord(record) {
+  const result = {}
+  const fields = [
+    'id',
+    'vendor',
+    'vendor_name',
+    'product_name',
+    'category',
+    'device_class',
+    'radio_band',
+    'firmware_target',
+    'platform',
+    'tx_type',
+    'screen_type',
+    'min_power_value',
+    'max_power_value',
+    'max_output_power_mw',
+    'pwm_outputs',
+    'diversity_type',
+    'notes',
+    'product_url',
+    'image_url',
+    'form_factor',
+  ]
+
+  for (const field of fields) {
+    const value = record[field]
+    if (value == null) continue
+    if (value === '') continue
+    result[field] = value
+  }
+
+  return result
 }
 
 const hardware = readJson(sourcePath)
@@ -220,8 +251,7 @@ for (const [vendor, vendorEntry] of Object.entries(hardware)) {
         ...defaults,
         ...(enrichedProducts[id] || {}),
       }
-      merged.tags = mergeTags(config, merged)
-      products.push(merged)
+      products.push(compactRecord(merged))
     }
   }
 }

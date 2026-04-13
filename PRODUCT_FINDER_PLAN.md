@@ -89,11 +89,6 @@ Implementation notes:
 - `radio_band`
 - `firmware_target`
 - `platform`
-- `upload_methods`
-- `features`
-- `min_version`
-- `layout_file`
-- `logo_file`
 - `min_power_value`
 - `max_power_value`
 - `pwm_outputs` when present in layout or overlay
@@ -116,6 +111,7 @@ Implementation note:
 
 - Everything else should be derived from the published target and hardware files where possible
 - The build only accepts these enrichment fields and ignores any others
+- Generated `products.json` is trimmed to the fields the frontend actually uses, plus allowed enrichment fields when present
 - `product_url`
 - `image_url`
 
